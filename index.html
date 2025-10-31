@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Projetos</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Import Map for Three.js (para carregamento dinâmico) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/examples/jsm/loaders/STLLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js",
+        "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js"
+      }
+    }
+    </script>
+
+    <!-- CSS Customizado -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            background-image: radial-gradient(circle at 1px 1px, rgba(255, 165, 0, 0.1) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+
+        .glass-card {
+            background: rgba(29, 29, 29, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(249, 115, 22, 0.2);
+            border-radius: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(249, 115, 22, 0.4);
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.1);
+        }
+        
+        .glass-input {
+            background: rgba(10, 10, 10, 0.5);
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            border-radius: 0.5rem;
+            color: #f0f0f0;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        .glass-input-search { padding-left: 2.5rem; }
+        .glass-input::placeholder { color: #a0a0a0; }
+        .glass-input:focus {
+            outline: none;
+            border-color: rgba(249, 115, 22, 0.7);
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.2);
+        }
+
+        .btn-primary {
+            background-color: #f97316;
+            color: #ffffff;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-color: #ea580c;
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(249, 115, 22, 0.1);
+            color: #f97316;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(249, 115, 22, 0.5);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .btn-secondary:hover { background: rgba(249, 115, 22, 0.2); }
+        .btn-secondary.active {
+            background: rgba(249, 115, 22, 0.8);
+            color: #fff;
+            border-color: rgba(249, 115, 22, 0);
+        }
+
+        .btn-action {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .btn-action:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(249, 115, 22, 0.5);
+            color: #f97316;
+        }
+        .btn-action.btn-delete:hover {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ea580c; }
+
+        /* Skeleton Loader */
+        .skeleton-loader {
+            background-color: #2a2a2a;
+            position: relative;
+            overflow: hidden;
+        }
+        .skeleton-loader::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -150%;
+            width: 150%; height: 100%;
+            background: linear-gradient(to right, transparent 0%, #3a3a3a 50%, transparent 100%);
+            animation: shimmer 1.5s infinite linear;
+        }
+        @keyframes shimmer { 0% { left: -150%; } 100% { left: 150%; } }
+
+        /* STL Viewer */
+        #stl-viewer-container {
+            width: 100%; height: 100%;
+            background-color: #1a1a1a;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            position: relative;
+        }
+        #stl-viewer-container canvas { display: block; }
+        
+        /* Preview Modal */
+        #preview-content {
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+        }
+
+        /* Card Flex Basis */
+        .flex-card-basis {
+            flex-grow: 0; flex-shrink: 0;
+            width: 100%;
+        }
+        @media (min-width: 640px) { .flex-card-basis { flex-basis: calc(50% - 0.75rem); } }
+        @media (min-width: 768px) { .flex-card-basis { flex-basis: calc(33.333% - 1rem); } }
+        @media (min-width: 1024px) { .flex-card-basis { flex-basis: calc(25% - 1.125rem); } }
+        @media (min-width: 1280px) { .flex-card-basis { flex-basis: calc(20% - 1.2rem); } }
+        
+        /* Breadcrumb */
+        .breadcrumb-link {
+            color: #a0a0a0;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .breadcrumb-link:hover { color: #f97316; }
+        .breadcrumb-separator {
+            color: #505050;
+            margin: 0 0.5rem;
+        }
+        .breadcrumb-current {
+            color: #ffffff;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+
+    <!-- Tela de Login -->
+    <div id="login-screen" class="flex items-center justify-center h-full p-4">
+        <div class="glass-card w-full max-w-md p-8 shadow-2xl">
+            <!--  -->
+            <img src="https://i.imgur.com/PomROoH.png" alt="Logo da Empresa" class="mx-auto h-24 mb-8">
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                    <input type="email" id="email" class="glass-input" placeholder="seu@email.com" required>
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-gray-300 mb-2">Senha</label>
+                    <input type="password" id="password" class="glass-input" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-primary w-full">Entrar</button>
+            </form>
+            <div id="login-error" class="text-red-400 text-center mt-4 text-sm"></div>
+        </div>
+    </div>
+
+    <!-- Tela Principal Unificada -->
+    <div id="main-screen" class="h-full flex flex-col" style="display: none;">
+        
+        <!-- Cabeçalho -->
+        <header class="glass-card flex-shrink-0 m-4 p-4 rounded-lg flex flex-col z-10 gap-4">
+            <!-- Linha 1: Logo, Breadcrumbs, Usuário e Sair -->
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-4">
+                    <!--  -->
+                    <img src="https://i.imgur.com/PomROoH.png" alt="Logo da Empresa" class="h-10">
+                    <!-- Container dos Breadcrumbs -->
+                    <nav id="breadcrumb-container" class="flex items-center text-xl"></nav>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="user-email-display" class="text-gray-400 text-sm italic hidden md:block"></span>
+                    <button id="admin-lock-btn" class="btn-secondary p-2" title="Modo Administrador">
+                        <svg id="admin-icon-locked" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>
+                        <svg id="admin-icon-unlocked" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" style="display: none;"><path d="M10 2a5 5 0 00-5 5v3H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V7a5 5 0 00-5-5zm0 1.5a3.5 3.5 0 11-3.5 3.5V10h7V7a3.5 3.5 0 00-3.5-3.5z" /></svg>
+                    </button>
+                    <button id="logout-btn" class="btn-secondary p-2" title="Sair">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" /></svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Linha 2: Ações (Busca, Visualização, Botões) -->
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="relative flex-grow max-w-xs">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                    </div>
+                    <input type="text" id="search-input" class="glass-input glass-input-search" placeholder="Buscar item...">
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2 rounded-lg p-1 bg-black/30">
+                        <button id="view-card-btn" class="btn-secondary active p-2" title="Visão em Cards">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v7.5H5V5zm0 8.5h10V15H5v-1.5z" /></svg>
+                        </button>
+                        <button id="view-list-btn" class="btn-secondary p-2" title="Visão em Lista">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </div>
+                    <button id="add-file-btn" class="btn-secondary flex items-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        <span class="hidden sm:inline">Adicionar Arquivos</span>
+                    </button>
+                    <button id="new-folder-btn" class="btn-secondary flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm10 4a1 1 0 100 2H8a1 1 0 100-2h4z" clip-rule="evenodd" /></svg>
+                        <span class="hidden sm:inline">Nova Pasta</span>
+                    </button>
+                    <button id="new-project-btn" class="btn-primary flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                        <span class="hidden sm:inline">Novo Projeto</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Container de Itens (Pastas e Arquivos) -->
+        <main id="item-container" class="flex-1 overflow-y-auto p-4 pt-0">
+            <div id="item-grid" class="flex flex-row flex-wrap gap-6 items-start">
+                <!-- Os itens (pastas e arquivos) serão renderizados aqui -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Input Global de Upload de Arquivos (oculto) -->
+    <input type="file" id="file-upload-input" class="hidden" multiple>
+
+    <!-- Modal: Novo Projeto (Cria pasta na raiz) -->
+    <div id="new-project-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="glass-card w-full max-w-lg p-6 rounded-xl">
+            <h2 class="text-2xl font-bold text-orange-400 mb-6">Criar Novo Projeto</h2>
+            <form id="new-project-form">
+                <div class="mb-4">
+                    <label for="project-name" class="block text-sm font-medium text-gray-300 mb-2">Nome do Projeto</label>
+                    <input type="text" id="project-name" class="glass-input" placeholder="Ex: Projeto 5589" required>
+                </div>
+                <div class="mb-6">
+                    <label for="project-image" class="block text-sm font-medium text-gray-300 mb-2">Imagem de Capa (para Card)</label>
+                    <input type="file" id="project-image" class="glass-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200" accept="image/*" required>
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="cancel-new-project-btn" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar Projeto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal: Nova Pasta (Cria pasta dentro da pasta atual) -->
+    <div id="new-folder-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="glass-card w-full max-w-lg p-6 rounded-xl">
+            <h2 class="text-2xl font-bold text-orange-400 mb-6">Criar Nova Pasta</h2>
+            <form id="new-folder-form">
+                <div class="mb-4">
+                    <label for="folder-name" class="block text-sm font-medium text-gray-300 mb-2">Nome da Pasta</label>
+                    <input type="text" id="folder-name" class="glass-input" placeholder="Ex: Modelos 3D" required>
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="cancel-new-folder-btn" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar Pasta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Senha (Admin) -->
+    <div id="password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="glass-card w-full max-w-sm p-6 rounded-xl">
+            <h2 class="text-2xl font-bold text-orange-400 mb-6">Modo Administrador</h2>
+            <p class="text-gray-300 mb-4">Insira a senha de administrador para continuar.</p>
+            <form id="password-form">
+                <div class="mb-4">
+                    <input type="password" id="admin-password" class="glass-input" placeholder="Senha de administrador" required>
+                </div>
+                <div id="password-error" class="text-red-400 text-sm mb-4"></div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="cancel-password-btn" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Visualizador 3D STL -->
+    <div id="stl-viewer-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="glass-card w-full max-w-4xl h-[90%] flex flex-col p-6 rounded-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-orange-400" id="stl-viewer-title">Visualizador 3D</h2>
+                <button id="close-stl-viewer-btn" class="btn-secondary p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div id="stl-viewer-container" class="flex-1 min-h-0"></div>
+            <div class="text-gray-400 text-sm mt-4 text-center">Arraste para girar, scroll para zoom.</div>
+        </div>
+    </div>
+
+    <!-- Modal: Pré-visualização (Imagens, PDF) -->
+    <div id="preview-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="glass-card w-full max-w-4xl h-[90%] flex flex-col p-6 rounded-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-orange-400" id="preview-title">Pré-visualização</h2>
+                <button id="close-preview-btn" class="btn-secondary p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div id="preview-content" class="flex-1 min-h-0">
+                <!-- Conteúdo (iframe ou img) será injetado aqui -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Global de Mensagens -->
+    <div id="global-message" class="fixed bottom-4 right-4 glass-card p-4 rounded-lg z-[100] text-white" style="display: none;"></div>
+
+    <!-- Scripts -->
+    <script type="module">
+        // Importar Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, setDoc, addDoc, onSnapshot, 
+            query, where, Timestamp, getDoc, getDocs, deleteDoc, setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getStorage, ref, uploadBytes, getDownloadURL, deleteObject 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+
+        // --- VARIÁVEIS DE CONFIGURAÇÃO ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDnpVYSC2v3Pbr4DGOxf-sKvcRhFFqtWRE",
+            authDomain: "maintence-6ef08.firebaseapp.com",
+            projectId: "maintence-6ef08",
+            storageBucket: "maintence-6ef08.firebasestorage.app",
+            messagingSenderId: "1085348103519",
+            appId: "1:1085348103519:web:06c21952276975ab5022ea",
+            measurementId: "G-31S2V238QE"
+        };
+        const ADMIN_PASSWORD = "admin";
+
+        // --- INICIALIZAÇÃO DO FIREBASE ---
+        let app, auth, db, storage, userId, userEmail, analytics;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            storage = getStorage(app);
+            analytics = getAnalytics(app);
+            setLogLevel('Debug');
+        } catch (e) {
+            console.error("Erro ao inicializar o Firebase:", e);
+            showMessage("Erro crítico de inicialização.", "error");
+        }
+
+        // --- VARIÁVEIS DE ESTADO DA UI ---
+        let currentView = 'card';
+        let isAdminMode = false;
+        let currentSearchTerm = "";
+        let itemsUnsubscribe = null;
+        let allItemsCache = []; // Cache para busca e navegação
+        let lazyLoadObserver = null;
+        
+        // Estado de Navegação
+        let currentFolderId = 'root'; // 'root' é o nível mais alto
+        let breadcrumbTrail = [{ id: 'root', name: 'Projetos' }];
+
+        // --- ELEMENTOS DO DOM ---
+        const loginScreen = document.getElementById('login-screen');
+        const mainScreen = document.getElementById('main-screen');
+        const loginForm = document.getElementById('login-form');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginError = document.getElementById('login-error');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userEmailDisplay = document.getElementById('user-email-display');
+        const searchInput = document.getElementById('search-input');
+        const viewCardBtn = document.getElementById('view-card-btn');
+        const viewListBtn = document.getElementById('view-list-btn');
+        const itemGrid = document.getElementById('item-grid');
+        const breadcrumbContainer = document.getElementById('breadcrumb-container');
+        
+        // Botões de Ação
+        const newProjectBtn = document.getElementById('new-project-btn');
+        const newFolderBtn = document.getElementById('new-folder-btn');
+        const addFileBtn = document.getElementById('add-file-btn');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        
+        // Modais
+        const newProjectModal = document.getElementById('new-project-modal');
+        const newProjectForm = document.getElementById('new-project-form');
+        const cancelNewProjectBtn = document.getElementById('cancel-new-project-btn');
+        const projectNameInput = document.getElementById('project-name');
+        const projectImageInput = document.getElementById('project-image');
+        
+        const newFolderModal = document.getElementById('new-folder-modal');
+        const newFolderForm = document.getElementById('new-folder-form');
+        const cancelNewFolderBtn = document.getElementById('cancel-new-folder-btn');
+        const folderNameInput = document.getElementById('folder-name');
+        
+        const adminLockBtn = document.getElementById('admin-lock-btn');
+        const adminIconLocked = document.getElementById('admin-icon-locked');
+        const adminIconUnlocked = document.getElementById('admin-icon-unlocked');
+        const passwordModal = document.getElementById('password-modal');
+        const passwordForm = document.getElementById('password-form');
+        const adminPasswordInput = document.getElementById('admin-password');
+        const passwordError = document.getElementById('password-error');
+        const cancelPasswordBtn = document.getElementById('cancel-password-btn');
+        
+        const stlViewerModal = document.getElementById('stl-viewer-modal');
+        const closeStlViewerBtn = document.getElementById('close-stl-viewer-btn');
+        const stlViewerContainer = document.getElementById('stl-viewer-container');
+        const stlViewerTitle = document.getElementById('stl-viewer-title');
+        
+        const previewModal = document.getElementById('preview-modal');
+        const closePreviewBtn = document.getElementById('close-preview-btn');
+        const previewContent = document.getElementById('preview-content');
+        const previewTitle = document.getElementById('preview-title');
+
+        const globalMessage = document.getElementById('global-message');
+        let passwordPendingAction = null; 
+
+        // --- LÓGICA DO VISUALIZADOR 3D (THREE.JS) ---
+        let threeJsLoaded = false;
+        let THREE_Module, STLLoader_Module, OrbitControls_Module;
+        let scene, camera, renderer, controls, animationFrameId;
+
+        async function ensureThreeJsLoaded() {
+            if (threeJsLoaded) return true;
+            if (THREE_Module) { threeJsLoaded = true; return true; }
+            showMessage("Carregando bibliotecas 3D...", "loading");
+            try {
+                THREE_Module = await import('three');
+                const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
+                STLLoader_Module = STLLoader;
+                const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
+                OrbitControls_Module = OrbitControls;
+                threeJsLoaded = true;
+                hideMessage();
+                return true;
+            } catch (error) {
+                console.error("Erro ao carregar bibliotecas 3D:", error);
+                showMessage("Erro ao carregar bibliotecas 3D.", "error");
+                return false;
+            }
+        }
+        
+        // --- FUNÇÕES DE CONTROLE DE UI ---
+        
+        function setupLazyLoader() {
+            const lazyImages = document.querySelectorAll('img.lazy-load');
+            if ("IntersectionObserver" in window) {
+                if (lazyLoadObserver) lazyLoadObserver.disconnect();
+                lazyLoadObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            img.src = img.dataset.src;
+                            img.classList.remove('lazy-load');
+                            observer.unobserve(img);
+                        }
+                    });
+                });
+                lazyImages.forEach(img => lazyLoadObserver.observe(img));
+            } else {
+                lazyImages.forEach(img => { img.src = img.dataset.src; img.classList.remove('lazy-load'); });
+            }
+        }
+
+        function showMessage(message, type, duration = 3000) {
+            globalMessage.textContent = message;
+            globalMessage.style.display = 'block';
+            globalMessage.classList.remove('bg-blue-500', 'bg-green-500', 'bg-red-500');
+            if (type === 'loading') globalMessage.classList.add('bg-blue-500');
+            else if (type === 'success') {
+                globalMessage.classList.add('bg-green-500');
+                setTimeout(() => globalMessage.style.display = 'none', duration);
+            } else if (type === 'error') {
+                globalMessage.classList.add('bg-red-500');
+                setTimeout(() => globalMessage.style.display = 'none', duration);
+            }
+        }
+        
+        function hideMessage() { globalMessage.style.display = 'none'; }
+
+        function showPage(pageName) {
+            loginScreen.style.display = 'none';
+            mainScreen.style.display = 'none';
+            if (pageName === 'login') loginScreen.style.display = 'flex';
+            else if (pageName === 'main') mainScreen.style.display = 'flex';
+        }
+
+        function setView(view) {
+            currentView = view;
+            if (view === 'card') {
+                viewCardBtn.classList.add('active');
+                viewListBtn.classList.remove('active');
+                itemGrid.className = 'flex flex-row flex-wrap gap-6 items-start';
+            } else {
+                viewListBtn.classList.add('active');
+                viewCardBtn.classList.remove('active');
+                itemGrid.className = 'flex flex-col gap-3';
+            }
+            renderCurrentFolder(); // Re-renderiza com a nova view
+        }
+
+        function updateAdminUI() {
+            if (isAdminMode) {
+                adminIconLocked.style.display = 'none';
+                adminIconUnlocked.style.display = 'flex';
+                adminLockBtn.classList.add('active');
+            } else {
+                adminIconLocked.style.display = 'flex';
+                adminIconUnlocked.style.display = 'none';
+                adminLockBtn.classList.remove('active');
+            }
+            renderCurrentFolder(); // Re-renderiza para mostrar/ocultar botões
+        }
+
+        /** Atualiza os botões de ação com base na pasta atual */
+        function updateActionButtons() {
+            if (currentFolderId === 'root') {
+                // Na raiz, mostramos "Novo Projeto" e escondemos "Nova Pasta" e "Add Arquivos"
+                newProjectBtn.style.display = 'flex';
+                newFolderBtn.style.display = 'none';
+                addFileBtn.style.display = 'none';
+            } else {
+                // Dentro de um projeto, escondemos "Novo Projeto" e mostramos os outros
+                newProjectBtn.style.display = 'none';
+                newFolderBtn.style.display = 'flex';
+                addFileBtn.style.display = 'flex';
+            }
+        }
+
+        // --- LÓGICA DE AUTENTICAÇÃO ---
+
+        onAuthStateChanged(auth, async (user) => {
+            if (itemsUnsubscribe) itemsUnsubscribe();
+            
+            if (user) {
+                userId = user.uid;
+                userEmail = user.email;
+                userEmailDisplay.textContent = `Bem-vindo, ${userEmail}`;
+                showPage('main');
+                loadAllItems();
+                navigateToFolder('root', 'Projetos'); // Garante que começamos na raiz
+            } else {
+                userId = null; userEmail = null;
+                userEmailDisplay.textContent = '';
+                isAdminMode = false;
+                updateAdminUI();
+                showPage('login');
+                allItemsCache = [];
+                breadcrumbTrail = [{ id: 'root', name: 'Projetos' }];
+                currentFolderId = 'root';
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loginError.textContent = '';
+            showMessage("Autenticando...", "loading");
+            try {
+                await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                hideMessage();
+                loginForm.reset();
+            } catch (error) {
+                hideMessage();
+                loginError.textContent = 'Email ou senha inválidos.';
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => { signOut(auth); });
+
+        // --- LÓGICA DE NAVEGAÇÃO E DADOS ---
+
+        /** Carrega TODOS os itens do usuário para o cache */
+        function loadAllItems() {
+            if (!userId) return;
+            if (itemsUnsubscribe) itemsUnsubscribe();
+            
+            // Nova coleção 'items'
+            const itemsPath = `artifacts/${firebaseConfig.projectId}/users/${userId}/items`;
+            const q = query(collection(db, itemsPath));
+            
+            itemsUnsubscribe = onSnapshot(q, (snapshot) => {
+                allItemsCache = [];
+                snapshot.forEach(doc => {
+                    allItemsCache.push({ id: doc.id, ...doc.data() });
+                });
+                renderCurrentFolder(); // Re-renderiza a pasta atual com os novos dados
+            }, (error) => {
+                console.error("Erro ao buscar itens:", error);
+                showMessage("Erro ao carregar dados.", "error");
+            });
+        }
+        
+        /** Navega para uma pasta (muda o estado e renderiza) */
+        function navigateToFolder(folderId, folderName) {
+            // Se clicarmos no link da pasta atual, não faz nada
+            if (currentFolderId === folderId) return;
+
+            currentFolderId = folderId;
+            
+            // Atualiza o breadcrumb
+            const existingIndex = breadcrumbTrail.findIndex(b => b.id === folderId);
+            if (existingIndex > -1) {
+                // Se clicou em um link "para trás" (ex: "Home"), corta o array
+                breadcrumbTrail = breadcrumbTrail.slice(0, existingIndex + 1);
+            } else {
+                // Se clicou em uma subpasta, adiciona ao array
+                breadcrumbTrail.push({ id: folderId, name: folderName });
+            }
+            
+            renderCurrentFolder();
+            updateActionButtons();
+        }
+
+        /** Renderiza o breadcrumb */
+        function renderBreadcrumbs() {
+            breadcrumbContainer.innerHTML = '';
+            breadcrumbTrail.forEach((crumb, index) => {
+                const isLast = index === breadcrumbTrail.length - 1;
+                
+                if (isLast) {
+                    const el = document.createElement('span');
+                    el.className = 'breadcrumb-current';
+                    el.textContent = crumb.name;
+                    breadcrumbContainer.appendChild(el);
+                } else {
+                    const el = document.createElement('a');
+                    el.className = 'breadcrumb-link';
+                    el.textContent = crumb.name;
+                    el.onclick = () => navigateToFolder(crumb.id, crumb.name);
+                    breadcrumbContainer.appendChild(el);
+                    
+                    const separator = document.createElement('span');
+                    separator.className = 'breadcrumb-separator';
+                    separator.textContent = '/';
+                    breadcrumbContainer.appendChild(separator);
+                }
+            });
+        }
+        
+        /** Filtra o cache e renderiza os itens da pasta atual */
+        function renderCurrentFolder() {
+            if (!userId) return;
+            
+            // 1. Filtra itens com base na pasta atual
+            let currentItems = allItemsCache.filter(item => item.parentId === currentFolderId);
+            
+            // 2. Filtra com base na busca
+            if (currentSearchTerm) {
+                const lowerCaseSearch = currentSearchTerm.toLowerCase();
+                currentItems = currentItems.filter(item => 
+                    item.name.toLowerCase().includes(lowerCaseSearch)
+                );
+            }
+            
+            // 3. Ordena: Pastas primeiro, depois arquivos, ambos alfabeticamente
+            currentItems.sort((a, b) => {
+                if (a.type !== b.type) {
+                    return a.type === 'folder' ? -1 : 1;
+                }
+                return a.name.localeCompare(b.name);
+            });
+            
+            // 4. Renderiza os itens e os breadcrumbs
+            renderItems(currentItems);
+            renderBreadcrumbs();
+        }
+
+        /** Renderiza os itens (pastas e arquivos) na tela */
+        function renderItems(items) {
+            itemGrid.innerHTML = '';
+            
+            if (items.length === 0) {
+                itemGrid.innerHTML = `<p class="text-gray-400 col-span-full text-center mt-10">${currentSearchTerm ? 'Nenhum item encontrado.' : 'Esta pasta está vazia.'}</p>`;
+                setupLazyLoader(); // Mesmo vazio, chama para limpar o observer antigo
+                return;
+            }
+            
+            items.forEach(item => {
+                if (item.type === 'folder') {
+                    itemGrid.appendChild(createFolderElement(item));
+                } else if (item.type === 'file') {
+                    itemGrid.appendChild(createFileElement(item));
+                }
+            });
+            
+            setupLazyLoader(); // Ativa o lazy loading para as novas imagens
+        }
+
+        /** Cria o elemento HTML para uma PASTA */
+        function createFolderElement(folder) {
+            const el = document.createElement('div');
+            const isProject = folder.parentId === 'root'; // É um "Projeto" se for pasta na raiz
+            
+            if (currentView === 'card') {
+                el.className = 'glass-card flex flex-col overflow-hidden transition-all duration-300 flex-card-basis cursor-pointer';
+                el.innerHTML = `
+                    <div class="p-4">
+                        ${isProject ? `
+                        <div class="h-48 w-full rounded-md skeleton-loader">
+                            <img data-src="${folder.coverImageUrl || 'https://placehold.co/400x300/111/f97316?text=Projeto'}" 
+                                 alt="Capa do ${folder.name}" 
+                                 class="h-48 w-full object-cover rounded-md lazy-load opacity-0 transition-opacity duration-500"
+                                 loading="lazy"
+                                 onerror="this.src='https://placehold.co/400x300/111/f97316?text=Erro'; this.classList.add('opacity-100'); this.parentElement.classList.remove('skeleton-loader');"
+                                 onload="this.classList.add('opacity-100'); this.parentElement.classList.remove('skeleton-loader');">
+                        </div>
+                        ` : `
+                        <div class="h-48 w-full rounded-md flex items-center justify-center bg-gray-800/50">
+                            <svg class="h-24 w-24 text-orange-400 opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                        </div>
+                        `}
+                        <div class="flex items-center justify-between mt-4">
+                            <h3 class="font-semibold text-lg text-white truncate">${folder.name}</h3>
+                            ${isAdminMode ? `
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <button class="btn-action btn-edit-item" title="Editar Pasta">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button class="btn-action btn-delete btn-delete-item" title="Excluir Pasta">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            } else { // 'list'
+                el.className = 'glass-card p-4 flex items-center justify-between w-full cursor-pointer transform hover:translate-x-1 hover:border-orange-500/50';
+                el.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <svg class="h-6 w-6 text-orange-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                        <h3 class="font-medium text-white truncate">${folder.name}</h3>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        ${isAdminMode ? `
+                        <button class="btn-action btn-edit-item" title="Editar Pasta">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button class="btn-action btn-delete btn-delete-item" title="Excluir Pasta">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                        ` : ''}
+                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                    </div>
+                `;
+            }
+            
+            // Listener de Navegação (clique principal)
+            el.addEventListener('click', () => navigateToFolder(folder.id, folder.name));
+            
+            // Listeners de Admin
+            if (isAdminMode) {
+                el.querySelector('.btn-edit-item')?.addEventListener('click', (e) => { e.stopPropagation(); editItemName(folder.id, folder.name); });
+                el.querySelector('.btn-delete-item')?.addEventListener('click', (e) => { e.stopPropagation(); deleteFolder(folder.id, folder.name, isProject ? folder.coverImageUrl : null); });
+            }
+            return el;
+        }
+
+        /** Cria o elemento HTML para um ARQUIVO */
+        function createFileElement(file) {
+            const el = document.createElement('div');
+            const fileName = file.name || "arquivo_sem_nome";
+            const fileType = file.fileType || "";
+            
+            const lastDot = fileName.lastIndexOf('.');
+            const baseName = lastDot > -1 ? fileName.substring(0, lastDot) : fileName;
+            const fileExtension = lastDot > -1 ? fileName.substring(lastDot + 1) : '';
+            const extLower = fileExtension.toLowerCase();
+            
+            // Lógica de detecção de tipo melhorada (Fallback para extensão)
+            const isSTL = extLower === 'stl';
+            const isImage = fileType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(extLower);
+            const isPdf = fileType === 'application/pdf' || extLower === 'pdf';
+            const canPreview = isImage || isPdf; // Preview padrão (imagem/pdf)
+            const isClickable = isSTL || canPreview; // Qualquer tipo de preview
+
+            // Arquivos sempre são renderizados no estilo "lista"
+            // Adiciona cursor-pointer e hover se for clicável
+            el.className = `glass-card p-3 flex items-center justify-between gap-2 w-full ${isClickable ? 'cursor-pointer hover:border-orange-500/50' : ''}`;
+            el.innerHTML = `
+                <div class="flex items-center gap-3 w-full max-w-[calc(100%-120px)] overflow-hidden">
+                    <svg class="h-6 w-6 text-orange-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                    <span class="font-medium text-white truncate" title="${fileName}">${baseName}</span>
+                    ${fileExtension ? `<span class="text-xs font-mono bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-sm flex-shrink-0">.${fileExtension.toUpperCase()}</span>` : ''}
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                    <!-- Botões de Preview (STL e Imagem/PDF) foram removidos daqui -->
+                    
+                    <a href="${file.fileUrl}" target="_blank" download="${file.name}" class="btn-action" title="Baixar Arquivo">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    </a>
+                    ${isAdminMode ? `
+                    <button class="btn-action btn-delete btn-delete-item" title="Excluir Arquivo">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                    ` : ''}
+                </div>
+            `;
+            
+            // --- Listeners ---
+            
+            // NOVO: Listener de clique principal para preview
+            if (isClickable) {
+                el.addEventListener('click', (e) => {
+                    // Impede que o clique no botão de download/delete acione o preview
+                    if (e.target.closest('.btn-action')) {
+                        return;
+                    }
+                    e.stopPropagation();
+                    
+                    if (isSTL) {
+                        viewStlFile(file.fileUrl, file.name);
+                    } else if (canPreview) {
+                        viewPreview(file.fileUrl, file.name, isImage, isPdf);
+                    }
+                });
+            }
+
+            // Listener do botão de delete (ainda precisa parar a propagação)
+            if (isAdminMode) {
+                el.querySelector('.btn-delete-item')?.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Impede que o clique acione o preview
+                    deleteFile(file.id, file.name, file.fileUrl);
+                });
+            }
+            
+            return el;
+        }
+
+        // --- LÓGICA DE CRIAÇÃO (Projetos, Pastas, Arquivos) ---
+
+        // Abrir Modal Novo Projeto
+        newProjectBtn.addEventListener('click', () => {
+            newProjectModal.style.display = 'flex';
+            newProjectForm.reset();
+        });
+        cancelNewProjectBtn.addEventListener('click', () => { newProjectModal.style.display = 'none'; });
+
+        // Salvar Novo Projeto
+        newProjectForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = projectNameInput.value;
+            const image = projectImageInput.files[0];
+            if (!name || !image || !userId) return;
+            
+            showMessage("Criando projeto...", "loading");
+            try {
+                // 1. Cria doc
+                const itemsPath = `artifacts/${firebaseConfig.projectId}/users/${userId}/items`;
+                const newItemRef = doc(collection(db, itemsPath));
+                const newItemId = newItemRef.id;
+                
+                // 2. Upload da capa
+                const imagePath = `users/${userId}/covers/${newItemId}/cover_${image.name}`;
+                const storageRefImg = ref(storage, imagePath);
+                await uploadBytes(storageRefImg, image);
+                const coverImageUrl = await getDownloadURL(storageRefImg);
+                
+                // 3. Salva no Firestore
+                await setDoc(newItemRef, {
+                    name: name,
+                    type: 'folder',
+                    parentId: 'root', // Projetos são pastas na raiz
+                    coverImageUrl: coverImageUrl,
+                    createdAt: Timestamp.now()
+                });
+                
+                showMessage("Projeto criado com sucesso!", "success");
+                newProjectModal.style.display = 'none';
+            } catch (error) {
+                console.error("Erro ao criar projeto:", error);
+                showMessage("Falha ao criar projeto.", "error");
+            }
+        });
+
+        // Abrir Modal Nova Pasta
+        newFolderBtn.addEventListener('click', () => {
+            newFolderModal.style.display = 'flex';
+            newFolderForm.reset();
+        });
+        cancelNewFolderBtn.addEventListener('click', () => { newFolderModal.style.display = 'none'; });
+
+        // Salvar Nova Pasta
+        newFolderForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = folderNameInput.value;
+            if (!name || !userId || currentFolderId === 'root') return;
+            
+            showMessage("Criando pasta...", "loading");
+            try {
+                const itemsPath = `artifacts/${firebaseConfig.projectId}/users/${userId}/items`;
+                await addDoc(collection(db, itemsPath), {
+                    name: name,
+                    type: 'folder',
+                    parentId: currentFolderId, // Salva na pasta atual
+                    createdAt: Timestamp.now()
+                });
+                showMessage("Pasta criada com sucesso!", "success");
+                newFolderModal.style.display = 'none';
+            } catch (error) {
+                console.error("Erro ao criar pasta:", error);
+                showMessage("Falha ao criar pasta.", "error");
+            }
+        });
+        
+        // Botão Adicionar Arquivos (em qualquer pasta)
+        addFileBtn.addEventListener('click', () => {
+            if (currentFolderId === 'root') return; // Não deve acontecer
+            fileUploadInput.click();
+        });
+        
+        // Listener do input de arquivo
+        fileUploadInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0 || !userId || currentFolderId === 'root') {
+                fileUploadInput.value = '';
+                return;
+            }
+            
+            const folderIdForUpload = currentFolderId;
+            showMessage(`Fazendo upload de ${files.length} arquivo(s)...`, "loading");
+            
+            const uploadPromises = [];
+            for (const file of files) {
+                const itemsPath = `artifacts/${firebaseConfig.projectId}/users/${userId}/items`;
+                const newItemRef = doc(collection(db, itemsPath)); // 1. Reserva o ID
+                const newItemId = newItemRef.id;
+
+                const filePath = `users/${userId}/files/${newItemId}/${file.name}`;
+                const storageRefFile = ref(storage, filePath);
+                
+                const uploadTask = async () => {
+                    await uploadBytes(storageRefFile, file); // 2. Faz upload
+                    const fileUrl = await getDownloadURL(storageRefFile); // 3. Pega URL
+                    // 4. Salva no Firestore
+                    await setDoc(newItemRef, {
+                        name: file.name,
+                        type: 'file',
+                        parentId: folderIdForUpload,
+                        fileUrl: fileUrl,
+                        fileType: file.type || 'application/octet-stream', // Garante que fileType exista
+                        fileSize: file.size, 
+                        uploadedAt: Timestamp.now()
+                    });
+                };
+                uploadPromises.push(uploadTask());
+            }
+            
+            try {
+                await Promise.all(uploadPromises);
+                showMessage(`Upload de ${files.length} arquivo(s) concluído!`, "success");
+            } catch (error) {
+                console.error("Erro ao adicionar arquivos:", error);
+                showMessage("Falha ao adicionar um ou mais arquivos.", "error");
+            } finally {
+                fileUploadInput.value = '';
+            }
+        });
+
+        // --- LÓGICA DE EXCLUSÃO E EDIÇÃO ---
+        
+        /** Edita o nome de qualquer item (pasta ou arquivo) */
+        async function editItemName(itemId, oldName) {
+             const newName = prompt(`Digite o novo nome para "${oldName}":`, oldName);
+             if (newName && newName !== oldName) {
+                showMessage("Atualizando nome...", "loading");
+                try {
+                    const itemRef = doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, itemId);
+                    await setDoc(itemRef, { name: newName }, { merge: true });
+                    showMessage("Nome atualizado!", "success");
+                } catch (e) {
+                    showMessage("Erro ao atualizar nome.", "error");
+                }
+             }
+        }
+        
+        /** Exclui uma pasta (SOMENTE SE ESTIVER VAZIA) */
+        async function deleteFolder(folderId, folderName, coverImageUrl) {
+            // 1. Verifica se a pasta está vazia
+            const hasChildren = allItemsCache.find(item => item.parentId === folderId);
+            if (hasChildren) {
+                showMessage(`Não é possível excluir. A pasta "${folderName}" não está vazia.`, "error", 4000);
+                return;
+            }
+            
+            if (!window.confirm(`Tem certeza que deseja excluir a pasta "${folderName}"?`)) return;
+            
+            showMessage(`Excluindo pasta "${folderName}"...`, "loading");
+            try {
+                // 2. Exclui a imagem de capa (se for um projeto)
+                if (coverImageUrl) {
+                    try {
+                        const coverPath = decodeURIComponent(coverImageUrl.split(firebaseConfig.storageBucket + '/o/')[1].split('?')[0]);
+                        await deleteObject(ref(storage, coverPath));
+                    } catch (e) { console.warn("Não foi possível excluir capa:", e); }
+                }
+                
+                // 3. Exclui o documento da pasta
+                await deleteDoc(doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, folderId));
+                showMessage("Pasta excluída com sucesso!", "success");
+            } catch (error) {
+                console.error("Erro ao excluir pasta:", error);
+                showMessage("Falha ao excluir pasta.", "error");
+            }
+        }
+        
+        /** Exclui um arquivo */
+        async function deleteFile(fileId, fileName, fileUrl) {
+            if (!window.confirm(`Tem certeza que deseja excluir o arquivo "${fileName}"?`)) return;
+            
+            showMessage(`Excluindo arquivo "${fileName}"...`, "loading");
+            try {
+                // 1. Excluir do Storage
+                if (fileUrl) {
+                    try {
+                        const filePathInStorage = decodeURIComponent(fileUrl.split(firebaseConfig.storageBucket + '/o/')[1].split('?')[0]);
+                        await deleteObject(ref(storage, filePathInStorage));
+                    } catch (e) { console.warn("Não foi possível excluir arquivo do storage:", e); }
+                }
+                
+                // 2. Excluir do Firestore
+                await deleteDoc(doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, fileId));
+                showMessage("Arquivo excluído com sucesso!", "success");
+            } catch (error) {
+                console.error("Erro ao excluir arquivo:", error);
+                showMessage("Falha ao excluir arquivo.", "error");
+            }
+        }
+
+        // --- LISTENERS DE UI GERAIS ---
+        viewCardBtn.addEventListener('click', () => setView('card'));
+        viewListBtn.addEventListener('click', () => setView('list'));
+        searchInput.addEventListener('input', (e) => {
+            currentSearchTerm = e.target.value;
+            renderCurrentFolder();
+        });
+
+        // Lógica Admin (Cadeado)
+        adminLockBtn.addEventListener('click', () => {
+            if (isAdminMode) {
+                isAdminMode = false;
+                updateAdminUI();
+            } else {
+                passwordPendingAction = 'toggleAdminMode';
+                passwordModal.style.display = 'flex';
+                adminPasswordInput.value = '';
+                passwordError.textContent = '';
+            }
+        });
+        cancelPasswordBtn.addEventListener('click', () => {
+            passwordModal.style.display = 'none';
+            passwordPendingAction = null;
+        });
+        passwordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            passwordError.textContent = '';
+            if (adminPasswordInput.value === ADMIN_PASSWORD) {
+                passwordModal.style.display = 'none';
+                if (passwordPendingAction === 'toggleAdminMode') {
+                    isAdminMode = true;
+                    updateAdminUI();
+                }
+                passwordPendingAction = null;
+            } else {
+                passwordError.textContent = 'Senha incorreta.';
+            }
+        });
+
+        // --- LÓGICA DOS VISUALIZADORES (STL e Preview) ---
+        
+        function initStlViewer() {
+            clearStlViewer();
+            const THREE = THREE_Module;
+            const OrbitControls = OrbitControls_Module;
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+            camera = new THREE.PerspectiveCamera(75, stlViewerContainer.clientWidth / stlViewerContainer.clientHeight, 0.1, 1000);
+            camera.position.z = 200;
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(stlViewerContainer.clientWidth, stlViewerContainer.clientHeight);
+            stlViewerContainer.appendChild(renderer.domElement);
+            scene.add(new THREE.HemisphereLight(0xffffff, 0x080820, 1.5));
+            scene.add(new THREE.DirectionalLight(0xffffff, 0.8));
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.screenSpacePanning = true;
+            window.addEventListener('resize', onWindowResize);
+        }
+        function onWindowResize() {
+            if (camera && renderer && stlViewerContainer) {
+                camera.aspect = stlViewerContainer.clientWidth / stlViewerContainer.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(stlViewerContainer.clientWidth, stlViewerContainer.clientHeight);
+            }
+        }
+        function animateStlViewer() {
+            animationFrameId = requestAnimationFrame(animateStlViewer);
+            if (controls) controls.update();
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+        function clearStlViewer() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            window.removeEventListener('resize', onWindowResize);
+            if (renderer) {
+                renderer.dispose();
+                while (stlViewerContainer.firstChild) {
+                    stlViewerContainer.removeChild(stlViewerContainer.firstChild);
+                }
+            }
+            scene = null; camera = null; renderer = null; controls = null;
+        }
+        async function viewStlFile(fileUrl, fileName) {
+            const loaded = await ensureThreeJsLoaded();
+            if (!loaded) {
+                console.error("Tentativa de abrir visualizador 3D falhou no carregamento.");
+                return;
+            }
+
+            stlViewerModal.style.display = 'flex';
+            stlViewerTitle.textContent = `Visualizador 3D: ${fileName}`;
+            showMessage("Carregando modelo 3D...", "loading");
+            
+            const THREE = THREE_Module;
+            const STLLoader = STLLoader_Module;
+            initStlViewer();
+            animateStlViewer();
+
+            try {
+                const loader = new STLLoader();
+                const geometry = await loader.loadAsync(fileUrl);
+                const material = new THREE.MeshPhongMaterial({ color: 0xf97316, specular: 0x111111, shininess: 100 });
+                const mesh = new THREE.Mesh(geometry, material);
+                scene.add(mesh);
+                geometry.computeBoundingBox();
+                const box = geometry.boundingBox;
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+                camera.position.set(center.x, center.y, center.z + cameraZ);
+                controls.target.set(center.x, center.y, center.z);
+                controls.update();
+                hideMessage();
+                showMessage("Modelo 3D carregado.", "success", 2000);
+            } catch (error) {
+                console.error("Erro ao carregar modelo STL:", error);
+                showMessage("Falha ao carregar modelo 3D.", "error");
+                clearStlViewer();
+                stlViewerModal.style.display = 'none';
+            }
+        }
+        closeStlViewerBtn.addEventListener('click', () => {
+            stlViewerModal.style.display = 'none';
+            clearStlViewer();
+        });
+
+        // Lógica do Preview (Imagem/PDF)
+        function viewPreview(fileUrl, fileName, isImage, isPdf) {
+            previewTitle.textContent = `Preview: ${fileName}`;
+            previewContent.innerHTML = ''; // Limpa conteúdo anterior
+
+            if (isImage) {
+                const img = document.createElement('img');
+                img.src = fileUrl;
+                img.className = 'w-full h-full object-contain';
+                previewContent.appendChild(img);
+            } else if (isPdf) {
+                const iframe = document.createElement('iframe');
+                iframe.src = fileUrl;
+                iframe.className = 'w-full h-full border-0 rounded-md';
+                previewContent.appendChild(iframe);
+            }
+            
+            previewModal.style.display = 'flex';
+        }
+        closePreviewBtn.addEventListener('click', () => {
+            previewModal.style.display = 'none';
+            previewContent.innerHTML = ''; // Limpa para liberar memória (especialmente do iframe)
+        });
+
+    </script>
+
+</body>
+</html>
+
