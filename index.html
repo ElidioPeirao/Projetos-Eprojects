@@ -48,6 +48,13 @@
             box-shadow: 0 0 20px rgba(249, 115, 22, 0.1);
         }
         
+        /* NOVO: Estilo para item selecionado */
+        .glass-card.selected-item {
+            border-color: #f97316; /* Laranja forte */
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
+            background: rgba(249, 115, 22, 0.1);
+        }
+        
         .glass-input {
             background: rgba(10, 10, 10, 0.5);
             border: 1px solid rgba(249, 115, 22, 0.3);
@@ -78,6 +85,21 @@
         .btn-primary:hover {
             background-color: #ea580c;
             box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
+        }
+        
+        /* NOVO: Estilo para botão de perigo (excluir seleção) */
+        .btn-danger {
+            background-color: #ef4444; /* red-500 */
+            color: #ffffff;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626; /* red-600 */
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
         }
 
         .btn-secondary {
@@ -231,8 +253,9 @@
                     </button>
                 </div>
             </div>
+            
             <!-- Linha 2: Ações (Busca, Visualização, Botões) -->
-            <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div id="main-action-bar" class="flex items-center justify-between gap-4 flex-wrap">
                 <div class="relative flex-grow max-w-xs">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
@@ -259,6 +282,21 @@
                     <button id="new-project-btn" class="btn-primary flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
                         <span class="hidden sm:inline">Novo Projeto</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- NOVO: Linha 3: Ações de Seleção (oculta por padrão) -->
+            <div id="selection-action-bar" class="items-center justify-between gap-4 flex-wrap" style="display: none;">
+                <span id="selection-count" class="text-lg font-medium text-white">0 itens selecionados</span>
+                <div class="flex items-center gap-4">
+                    <button id="download-selection-btn" class="btn-secondary flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        Baixar
+                    </button>
+                    <button id="delete-selection-btn" class="btn-danger flex items-center gap-2" style="display: none;"> <!-- Apenas admin -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Excluir
                     </button>
                 </div>
             </div>
@@ -387,7 +425,7 @@
             appId: "1:1085348103519:web:06c21952276975ab5022ea",
             measurementId: "G-31S2V238QE"
         };
-        const ADMIN_PASSWORD = "admin";
+        const ADMIN_PASSWORD = "sua_senha_secreta_aqui";
 
         // --- INICIALIZAÇÃO DO FIREBASE ---
         let app, auth, db, storage, userId, userEmail, analytics;
@@ -410,6 +448,7 @@
         let itemsUnsubscribe = null;
         let allItemsCache = []; // Cache para busca e navegação
         let lazyLoadObserver = null;
+        let selectedItems = new Set(); // NOVO: Para seleção múltipla
         
         // Estado de Navegação
         let currentFolderId = 'root'; // 'root' é o nível mais alto
@@ -427,14 +466,22 @@
         const searchInput = document.getElementById('search-input');
         const viewCardBtn = document.getElementById('view-card-btn');
         const viewListBtn = document.getElementById('view-list-btn');
+        const itemContainer = document.getElementById('item-container'); // NOVO: Referência ao container
         const itemGrid = document.getElementById('item-grid');
         const breadcrumbContainer = document.getElementById('breadcrumb-container');
         
         // Botões de Ação
+        const mainActionBar = document.getElementById('main-action-bar'); // NOVO: Barra de ação principal
         const newProjectBtn = document.getElementById('new-project-btn');
         const newFolderBtn = document.getElementById('new-folder-btn');
         const addFileBtn = document.getElementById('add-file-btn');
         const fileUploadInput = document.getElementById('file-upload-input');
+        
+        // NOVO: Barra de Ação de Seleção
+        const selectionActionBar = document.getElementById('selection-action-bar');
+        const selectionCountEl = document.getElementById('selection-count');
+        const downloadSelectionBtn = document.getElementById('download-selection-btn');
+        const deleteSelectionBtn = document.getElementById('delete-selection-btn');
         
         // Modais
         const newProjectModal = document.getElementById('new-project-modal');
@@ -564,7 +611,45 @@
                 adminIconUnlocked.style.display = 'none';
                 adminLockBtn.classList.remove('active');
             }
-            renderCurrentFolder(); // Re-renderiza para mostrar/ocultar botões
+            updateSelectionUI(); // Atualiza a barra de seleção (para mostrar/ocultar delete)
+            renderCurrentFolder(); // Re-renderiza para mostrar/ocultar botões nos itens
+        }
+        
+        // NOVO: Controla a barra de seleção
+        function updateSelectionUI() {
+            if (selectedItems.size > 0) {
+                mainActionBar.style.display = 'none';
+                selectionActionBar.style.display = 'flex';
+                selectionCountEl.textContent = `${selectedItems.size} item(s) selecionado(s)`;
+                deleteSelectionBtn.style.display = isAdminMode ? 'flex' : 'none';
+            } else {
+                mainActionBar.style.display = 'flex';
+                selectionActionBar.style.display = 'none';
+            }
+            // Atualiza as classes dos elementos visíveis
+            document.querySelectorAll('[data-item-id]').forEach(el => {
+                if (selectedItems.has(el.dataset.itemId)) {
+                    el.classList.add('selected-item');
+                } else {
+                    el.classList.remove('selected-item');
+                }
+            });
+        }
+        
+        // NOVO: Limpa a seleção
+        function clearSelection() {
+            selectedItems.clear();
+            updateSelectionUI();
+        }
+        
+        // NOVO: Alterna a seleção de um item
+        function toggleItemSelection(itemId) {
+            if (selectedItems.has(itemId)) {
+                selectedItems.delete(itemId);
+            } else {
+                selectedItems.add(itemId);
+            }
+            updateSelectionUI();
         }
 
         /** Atualiza os botões de ação com base na pasta atual */
@@ -662,6 +747,7 @@
                 breadcrumbTrail.push({ id: folderId, name: folderName });
             }
             
+            clearSelection(); // Limpa seleção ao mudar de pasta
             renderCurrentFolder();
             updateActionButtons();
         }
@@ -718,6 +804,7 @@
             // 4. Renderiza os itens e os breadcrumbs
             renderItems(currentItems);
             renderBreadcrumbs();
+            updateSelectionUI(); // Garante que a barra de seleção esteja correta
         }
 
         /** Renderiza os itens (pastas e arquivos) na tela */
@@ -744,10 +831,13 @@
         /** Cria o elemento HTML para uma PASTA */
         function createFolderElement(folder) {
             const el = document.createElement('div');
+            el.dataset.itemId = folder.id; // NOVO: Adiciona ID para seleção
+            if (selectedItems.has(folder.id)) el.classList.add('selected-item'); // NOVO: Aplica classe
+            
             const isProject = folder.parentId === 'root'; // É um "Projeto" se for pasta na raiz
             
             if (currentView === 'card') {
-                el.className = 'glass-card flex flex-col overflow-hidden transition-all duration-300 flex-card-basis cursor-pointer';
+                el.className = `glass-card flex flex-col overflow-hidden transition-all duration-300 flex-card-basis cursor-pointer ${selectedItems.has(folder.id) ? 'selected-item' : ''}`;
                 el.innerHTML = `
                     <div class="p-4">
                         ${isProject ? `
@@ -780,7 +870,7 @@
                     </div>
                 `;
             } else { // 'list'
-                el.className = 'glass-card p-4 flex items-center justify-between w-full cursor-pointer transform hover:translate-x-1 hover:border-orange-500/50';
+                el.className = `glass-card p-4 flex items-center justify-between w-full cursor-pointer transform hover:translate-x-1 hover:border-orange-500/50 ${selectedItems.has(folder.id) ? 'selected-item' : ''}`;
                 el.innerHTML = `
                     <div class="flex items-center gap-3 overflow-hidden">
                         <svg class="h-6 w-6 text-orange-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
@@ -800,8 +890,26 @@
                 `;
             }
             
-            // Listener de Navegação (clique principal)
-            el.addEventListener('click', () => navigateToFolder(folder.id, folder.name));
+            // NOVO: Listener de Seleção/Navegação
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.btn-action')) return; // Ignora clique nos botões de ação
+
+                if (e.ctrlKey || e.metaKey) {
+                    e.stopPropagation(); 
+                    toggleItemSelection(folder.id);
+                } else {
+                    // Se já está selecionado E é a única seleção, navega
+                    if (selectedItems.has(folder.id) && selectedItems.size === 1) {
+                        navigateToFolder(folder.id, folder.name);
+                    } else {
+                        // Caso contrário, limpa e seleciona este
+                        e.stopPropagation();
+                        selectedItems.clear();
+                        selectedItems.add(folder.id);
+                        updateSelectionUI();
+                    }
+                }
+            });
             
             // Listeners de Admin
             if (isAdminMode) {
@@ -814,6 +922,8 @@
         /** Cria o elemento HTML para um ARQUIVO */
         function createFileElement(file) {
             const el = document.createElement('div');
+            el.dataset.itemId = file.id; // NOVO: Adiciona ID para seleção
+            
             const fileName = file.name || "arquivo_sem_nome";
             const fileType = file.fileType || "";
             
@@ -831,7 +941,7 @@
 
             if (currentView === 'card') {
                 // --- NOVO CARD VIEW PARA ARQUIVOS ---
-                el.className = `glass-card flex flex-col overflow-hidden transition-all duration-300 flex-card-basis ${isClickable ? 'cursor-pointer' : ''}`;
+                el.className = `glass-card flex flex-col overflow-hidden transition-all duration-300 flex-card-basis ${isClickable ? 'cursor-pointer' : ''} ${selectedItems.has(file.id) ? 'selected-item' : ''}`;
                 
                 let thumbnailHtml = '';
                 if (isImage) {
@@ -886,7 +996,7 @@
 
             } else {
                 // --- VISÃO EM LISTA (EXISTENTE) ---
-                el.className = `glass-card p-3 flex items-center justify-between gap-2 w-full ${isClickable ? 'cursor-pointer hover:border-orange-500/50' : ''}`;
+                el.className = `glass-card p-3 flex items-center justify-between gap-2 w-full ${isClickable ? 'cursor-pointer hover:border-orange-500/50' : ''} ${selectedItems.has(file.id) ? 'selected-item' : ''}`;
                 el.innerHTML = `
                     <div class="flex items-center gap-3 w-full max-w-[calc(100%-120px)] overflow-hidden">
                         <svg class="h-6 w-6 text-orange-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
@@ -908,21 +1018,41 @@
             
             // --- Listeners (APLICADOS A AMBAS AS VISÕES) ---
             
-            // Listener de clique principal para preview
+            // Listener de clique principal para preview/seleção
             if (isClickable) {
                 el.addEventListener('click', (e) => {
-                    // Impede que o clique no botão de download/delete acione o preview
-                    if (e.target.closest('.btn-action')) {
-                        return;
-                    }
+                    if (e.target.closest('.btn-action')) return;
                     e.stopPropagation();
-                    
-                    if (isSTL) {
-                        viewStlFile(file.fileUrl, file.name);
-                    } else if (canPreview) {
-                        viewPreview(file.fileUrl, file.name, isImage, isPdf);
+
+                    if (e.ctrlKey || e.metaKey) {
+                        toggleItemSelection(file.id);
+                    } else {
+                        // Se já está selecionado E é a única seleção, abre o preview
+                        if (selectedItems.has(file.id) && selectedItems.size === 1) {
+                            if (isSTL) viewStlFile(file.fileUrl, file.name);
+                            else if (canPreview) viewPreview(file.fileUrl, file.name, isImage, isPdf);
+                        } else {
+                            // Caso contrário, limpa e seleciona este
+                            selectedItems.clear();
+                            selectedItems.add(file.id);
+                            updateSelectionUI();
+                        }
                     }
                 });
+            } else {
+                // Se não for clicável (arquivo genérico), o clique apenas seleciona
+                 el.addEventListener('click', (e) => {
+                    if (e.target.closest('.btn-action')) return;
+                    e.stopPropagation();
+                    
+                    if (e.ctrlKey || e.metaKey) {
+                        toggleItemSelection(file.id);
+                    } else {
+                        selectedItems.clear();
+                        selectedItems.add(file.id);
+                        updateSelectionUI();
+                    }
+                 });
             }
 
             // Listener do botão de delete (ainda precisa parar a propagação)
@@ -1089,17 +1219,17 @@
         }
         
         /** Exclui uma pasta (SOMENTE SE ESTIVER VAZIA) */
-        async function deleteFolder(folderId, folderName, coverImageUrl) {
+        async function deleteFolder(folderId, folderName, coverImageUrl, skipConfirm = false) {
             // 1. Verifica se a pasta está vazia
             const hasChildren = allItemsCache.find(item => item.parentId === folderId);
             if (hasChildren) {
                 showMessage(`Não é possível excluir. A pasta "${folderName}" não está vazia.`, "error", 4000);
-                return;
+                return; // Retorna uma promessa rejeitada para o Promise.all
             }
             
-            if (!window.confirm(`Tem certeza que deseja excluir a pasta "${folderName}"?`)) return;
+            if (!skipConfirm && !window.confirm(`Tem certeza que deseja excluir a pasta "${folderName}"?`)) return;
             
-            showMessage(`Excluindo pasta "${folderName}"...`, "loading");
+            if (!skipConfirm) showMessage(`Excluindo pasta "${folderName}"...`, "loading");
             try {
                 // 2. Exclui a imagem de capa (se for um projeto)
                 if (coverImageUrl) {
@@ -1111,18 +1241,19 @@
                 
                 // 3. Exclui o documento da pasta
                 await deleteDoc(doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, folderId));
-                showMessage("Pasta excluída com sucesso!", "success");
+                if (!skipConfirm) showMessage("Pasta excluída com sucesso!", "success");
             } catch (error) {
                 console.error("Erro ao excluir pasta:", error);
-                showMessage("Falha ao excluir pasta.", "error");
+                if (!skipConfirm) showMessage("Falha ao excluir pasta.", "error");
+                throw error; // Propaga o erro para o Promise.all
             }
         }
         
         /** Exclui um arquivo */
-        async function deleteFile(fileId, fileName, fileUrl) {
-            if (!window.confirm(`Tem certeza que deseja excluir o arquivo "${fileName}"?`)) return;
+        async function deleteFile(fileId, fileName, fileUrl, skipConfirm = false) {
+            if (!skipConfirm && !window.confirm(`Tem certeza que deseja excluir o arquivo "${fileName}"?`)) return;
             
-            showMessage(`Excluindo arquivo "${fileName}"...`, "loading");
+            if (!skipConfirm) showMessage(`Excluindo arquivo "${fileName}"...`, "loading");
             try {
                 // 1. Excluir do Storage
                 if (fileUrl) {
@@ -1134,10 +1265,11 @@
                 
                 // 2. Excluir do Firestore
                 await deleteDoc(doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, fileId));
-                showMessage("Arquivo excluído com sucesso!", "success");
+                if (!skipConfirm) showMessage("Arquivo excluído com sucesso!", "success");
             } catch (error) {
                 console.error("Erro ao excluir arquivo:", error);
-                showMessage("Falha ao excluir arquivo.", "error");
+                if (!skipConfirm) showMessage("Falha ao excluir arquivo.", "error");
+                throw error; // Propaga o erro para o Promise.all
             }
         }
 
@@ -1147,6 +1279,13 @@
         searchInput.addEventListener('input', (e) => {
             currentSearchTerm = e.target.value;
             renderCurrentFolder();
+        });
+        
+        // NOVO: Limpa seleção ao clicar no fundo
+        itemContainer.addEventListener('click', (e) => {
+            if (e.target === itemContainer) {
+                clearSelection();
+            }
         });
 
         // Lógica Admin (Cadeado)
@@ -1179,6 +1318,76 @@
                 passwordError.textContent = 'Senha incorreta.';
             }
         });
+        
+        // NOVO: Listeners da Barra de Seleção
+        downloadSelectionBtn.addEventListener('click', () => {
+            let filesToDownload = 0;
+            for (const itemId of selectedItems) {
+                const item = allItemsCache.find(i => i.id === itemId);
+                if (item && item.type === 'file') {
+                    // Criar um link 'a' e clicar nele
+                    const link = document.createElement('a');
+                    link.href = item.fileUrl;
+                    link.download = item.name;
+                    link.target = '_blank'; // Ajuda
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    filesToDownload++;
+                }
+            }
+            if (filesToDownload === 0) {
+                showMessage("Nenhum *arquivo* selecionado para baixar. Pastas não podem ser baixadas.", "warning", 4000);
+            } else {
+                showMessage(`Iniciando download de ${filesToDownload} arquivo(s)... (Verifique permissões do navegador)`, "success", 4000);
+            }
+            clearSelection();
+        });
+        
+        deleteSelectionBtn.addEventListener('click', async () => {
+            if (!window.confirm(`Tem certeza que deseja excluir ${selectedItems.size} item(s)? Pastas NÃO vazias não serão excluídas.`)) return;
+            
+            showMessage(`Excluindo ${selectedItems.size} item(s)...`, 'loading');
+            let deletePromises = [];
+            let failedFolders = 0;
+            
+            // É importante iterar sobre uma cópia, pois 'selectedItems' será limpo
+            const itemsToDelete = new Set(selectedItems);
+            
+            for (const itemId of itemsToDelete) {
+                const item = allItemsCache.find(i => i.id === itemId);
+                if (!item) continue;
+                
+                if (item.type === 'folder') {
+                    const isProject = item.parentId === 'root';
+                    const coverUrl = isProject ? item.coverImageUrl : null;
+                    const hasChildren = allItemsCache.find(i => i.parentId === item.id);
+                    if (hasChildren) {
+                        failedFolders++;
+                    } else {
+                        // Passa 'true' para pular a confirmação individual
+                        deletePromises.push(deleteFolder(item.id, item.name, coverUrl, true)); 
+                    }
+                } else if (item.type === 'file') {
+                    // Passa 'true' para pular a confirmação individual
+                    deletePromises.push(deleteFile(item.id, item.name, item.fileUrl, true)); 
+                }
+            }
+            
+            try {
+                await Promise.all(deletePromises);
+                let msg = `${deletePromises.length} item(s) excluído(s).`;
+                if (failedFolders > 0) {
+                    msg += ` ${failedFolders} pasta(s) não foram excluídas pois não estão vazias.`;
+                }
+                showMessage(msg, 'success', 4000);
+            } catch (e) {
+                showMessage('Erro ao excluir um ou mais itens.', 'error');
+            } finally {
+                clearSelection();
+            }
+        });
+
 
         // --- LÓGICA DOS VISUALIZADORES (STL e Preview) ---
         
