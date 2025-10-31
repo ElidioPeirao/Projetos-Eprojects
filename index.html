@@ -19,7 +19,11 @@
       "imports": {
         "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
         "three/examples/jsm/loaders/STLLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js",
-        "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js"
+        "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js",
+        "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+        "three/examples/jsm/loaders/DRACOLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/DRACOLoader.js",
+        "three/examples/jsm/loaders/KTX2Loader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/KTX2Loader.js",
+        "three/examples/jsm/libs/meshopt_decoder.module.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/meshopt_decoder.module.js"
       }
     }
     </script>
@@ -48,7 +52,7 @@
             box-shadow: 0 0 20px rgba(249, 115, 22, 0.1);
         }
         
-        /* NOVO: Estilo para item selecionado */
+        /* Estilo para item selecionado */
         .glass-card.selected-item {
             border-color: #f97316; /* Laranja forte */
             box-shadow: 0 0 15px rgba(249, 115, 22, 0.4);
@@ -59,7 +63,7 @@
             background: rgba(10, 10, 10, 0.5);
             border: 1px solid rgba(249, 115, 22, 0.3);
             border-radius: 0.5rem;
-            color: #f0f0f0;
+            color: #f0f0e0;
             padding: 0.75rem 1rem;
             width: 100%;
             transition: all 0.3s ease;
@@ -87,7 +91,7 @@
             box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
         }
         
-        /* NOVO: Estilo para botão de perigo (excluir seleção) */
+        /* Estilo para botão de perigo (excluir seleção) */
         .btn-danger {
             background-color: #ef4444; /* red-500 */
             color: #ffffff;
@@ -286,7 +290,7 @@
                 </div>
             </div>
             
-            <!-- NOVO: Linha 3: Ações de Seleção (oculta por padrão) -->
+            <!-- Linha 3: Ações de Seleção (oculta por padrão) -->
             <div id="selection-action-bar" class="items-center justify-between gap-4 flex-wrap" style="display: none;">
                 <span id="selection-count" class="text-lg font-medium text-white">0 itens selecionados</span>
                 <div class="flex items-center gap-4">
@@ -369,7 +373,19 @@
         </div>
     </div>
 
-    <!-- Modal: Visualizador 3D STL -->
+    <!-- Modal: Confirmar Exclusão (NOVO) -->
+    <div id="confirm-delete-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
+        <div class="glass-card w-full max-w-sm p-6 rounded-xl">
+            <h2 class="text-2xl font-bold text-red-500 mb-4">Confirmar Exclusão</h2>
+            <p id="confirm-delete-message" class="text-gray-300 mb-6">Você tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.</p>
+            <div class="flex justify-end gap-4">
+                <button type="button" id="cancel-delete-btn" class="btn-secondary">Cancelar</button>
+                <button type="button" id="confirm-delete-btn" class="btn-danger">Excluir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Visualizador 3D STL / GLB -->
     <div id="stl-viewer-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" style="display: none;">
         <div class="glass-card w-full max-w-4xl h-[90%] flex flex-col p-6 rounded-xl">
             <div class="flex justify-between items-center mb-4">
@@ -425,7 +441,7 @@
             appId: "1:1085348103519:web:06c21952276975ab5022ea",
             measurementId: "G-31S2V238QE"
         };
-        const ADMIN_PASSWORD = "admin";
+        const ADMIN_PASSWORD = "sua_senha_secreta_aqui";
 
         // --- INICIALIZAÇÃO DO FIREBASE ---
         let app, auth, db, storage, userId, userEmail, analytics;
@@ -448,7 +464,7 @@
         let itemsUnsubscribe = null;
         let allItemsCache = []; // Cache para busca e navegação
         let lazyLoadObserver = null;
-        let selectedItems = new Set(); // NOVO: Para seleção múltipla
+        let selectedItems = new Set(); // Para seleção múltipla
         
         // Estado de Navegação
         let currentFolderId = 'root'; // 'root' é o nível mais alto
@@ -466,18 +482,18 @@
         const searchInput = document.getElementById('search-input');
         const viewCardBtn = document.getElementById('view-card-btn');
         const viewListBtn = document.getElementById('view-list-btn');
-        const itemContainer = document.getElementById('item-container'); // NOVO: Referência ao container
+        const itemContainer = document.getElementById('item-container');
         const itemGrid = document.getElementById('item-grid');
         const breadcrumbContainer = document.getElementById('breadcrumb-container');
         
         // Botões de Ação
-        const mainActionBar = document.getElementById('main-action-bar'); // NOVO: Barra de ação principal
+        const mainActionBar = document.getElementById('main-action-bar');
         const newProjectBtn = document.getElementById('new-project-btn');
         const newFolderBtn = document.getElementById('new-folder-btn');
         const addFileBtn = document.getElementById('add-file-btn');
         const fileUploadInput = document.getElementById('file-upload-input');
         
-        // NOVO: Barra de Ação de Seleção
+        // Barra de Ação de Seleção
         const selectionActionBar = document.getElementById('selection-action-bar');
         const selectionCountEl = document.getElementById('selection-count');
         const downloadSelectionBtn = document.getElementById('download-selection-btn');
@@ -504,6 +520,12 @@
         const passwordError = document.getElementById('password-error');
         const cancelPasswordBtn = document.getElementById('cancel-password-btn');
         
+        // NOVO: Modal de Exclusão
+        const confirmDeleteModal = document.getElementById('confirm-delete-modal');
+        const confirmDeleteMessage = document.getElementById('confirm-delete-message');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
         const stlViewerModal = document.getElementById('stl-viewer-modal');
         const closeStlViewerBtn = document.getElementById('close-stl-viewer-btn');
         const stlViewerContainer = document.getElementById('stl-viewer-container');
@@ -516,10 +538,11 @@
 
         const globalMessage = document.getElementById('global-message');
         let passwordPendingAction = null; 
+        let deletePendingAction = null; // NOVO: Para guardar a ação de exclusão
 
         // --- LÓGICA DO VISUALIZADOR 3D (THREE.JS) ---
         let threeJsLoaded = false;
-        let THREE_Module, STLLoader_Module, OrbitControls_Module;
+        let THREE_Module, STLLoader_Module, OrbitControls_Module, GLTFLoader_Module, DRACOLoader_Module, KTX2Loader_Module, MeshoptDecoder_Module;
         let scene, camera, renderer, controls, animationFrameId;
 
         async function ensureThreeJsLoaded() {
@@ -527,11 +550,23 @@
             if (THREE_Module) { threeJsLoaded = true; return true; }
             showMessage("Carregando bibliotecas 3D...", "loading");
             try {
-                THREE_Module = await import('three');
+                // Carrega todos os módulos 3D necessários de uma vez
+                [THREE_Module] = await Promise.all([
+                    import('three')
+                ]);
                 const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
                 STLLoader_Module = STLLoader;
                 const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
                 OrbitControls_Module = OrbitControls;
+                const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+                GLTFLoader_Module = GLTFLoader;
+                const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader.js');
+                DRACOLoader_Module = DRACOLoader;
+                const { KTX2Loader } = await import('three/examples/jsm/loaders/KTX2Loader.js');
+                KTX2Loader_Module = KTX2Loader;
+                const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
+                MeshoptDecoder_Module = MeshoptDecoder;
+                
                 threeJsLoaded = true;
                 hideMessage();
                 return true;
@@ -615,7 +650,7 @@
             renderCurrentFolder(); // Re-renderiza para mostrar/ocultar botões nos itens
         }
         
-        // NOVO: Controla a barra de seleção
+        // Controla a barra de seleção
         function updateSelectionUI() {
             if (selectedItems.size > 0) {
                 mainActionBar.style.display = 'none';
@@ -636,13 +671,13 @@
             });
         }
         
-        // NOVO: Limpa a seleção
+        // Limpa a seleção
         function clearSelection() {
             selectedItems.clear();
             updateSelectionUI();
         }
         
-        // NOVO: Alterna a seleção de um item
+        // Alterna a seleção de um item
         function toggleItemSelection(itemId) {
             if (selectedItems.has(itemId)) {
                 selectedItems.delete(itemId);
@@ -733,7 +768,7 @@
         /** Navega para uma pasta (muda o estado e renderiza) */
         function navigateToFolder(folderId, folderName) {
             // Se clicarmos no link da pasta atual, não faz nada
-            if (currentFolderId === folderId) return;
+            if (currentFolderId === folderId && breadcrumbTrail.length > 1) return;
 
             currentFolderId = folderId;
             
@@ -831,8 +866,7 @@
         /** Cria o elemento HTML para uma PASTA */
         function createFolderElement(folder) {
             const el = document.createElement('div');
-            el.dataset.itemId = folder.id; // NOVO: Adiciona ID para seleção
-            if (selectedItems.has(folder.id)) el.classList.add('selected-item'); // NOVO: Aplica classe
+            el.dataset.itemId = folder.id; // Adiciona ID para seleção
             
             const isProject = folder.parentId === 'root'; // É um "Projeto" se for pasta na raiz
             
@@ -890,31 +924,33 @@
                 `;
             }
             
-            // NOVO: Listener de Seleção/Navegação
+            // Listener de Seleção/Navegação
             el.addEventListener('click', (e) => {
                 if (e.target.closest('.btn-action')) return; // Ignora clique nos botões de ação
+                e.stopPropagation(); // Previne clique no container de limpar seleção
 
                 if (e.ctrlKey || e.metaKey) {
-                    e.stopPropagation(); 
+                    // SE CTRL/META ESTIVER PRESSIONADO: Alterna seleção
                     toggleItemSelection(folder.id);
                 } else {
-                    // Se já está selecionado E é a única seleção, navega
-                    if (selectedItems.has(folder.id) && selectedItems.size === 1) {
-                        navigateToFolder(folder.id, folder.name);
-                    } else {
-                        // Caso contrário, limpa e seleciona este
-                        e.stopPropagation();
-                        selectedItems.clear();
-                        selectedItems.add(folder.id);
-                        updateSelectionUI();
-                    }
+                    // SE FOR CLIQUE SIMPLES: Navega para a pasta
+                    navigateToFolder(folder.id, folder.name);
                 }
             });
             
             // Listeners de Admin
             if (isAdminMode) {
                 el.querySelector('.btn-edit-item')?.addEventListener('click', (e) => { e.stopPropagation(); editItemName(folder.id, folder.name); });
-                el.querySelector('.btn-delete-item')?.addEventListener('click', (e) => { e.stopPropagation(); deleteFolder(folder.id, folder.name, isProject ? folder.coverImageUrl : null); });
+                el.querySelector('.btn-delete-item')?.addEventListener('click', (e) => { 
+                    e.stopPropagation(); 
+                    // CHAMA O MODAL DE CONFIRMAÇÃO
+                    promptDelete({ 
+                        type: 'folder', 
+                        id: folder.id, 
+                        name: folder.name, 
+                        cover: isProject ? folder.coverImageUrl : null 
+                    });
+                });
             }
             return el;
         }
@@ -922,7 +958,7 @@
         /** Cria o elemento HTML para um ARQUIVO */
         function createFileElement(file) {
             const el = document.createElement('div');
-            el.dataset.itemId = file.id; // NOVO: Adiciona ID para seleção
+            el.dataset.itemId = file.id; // Adiciona ID para seleção
             
             const fileName = file.name || "arquivo_sem_nome";
             const fileType = file.fileType || "";
@@ -932,15 +968,17 @@
             const fileExtension = lastDot > -1 ? fileName.substring(lastDot + 1) : '';
             const extLower = fileExtension.toLowerCase();
             
-            // Lógica de detecção de tipo melhorada (Fallback para extensão)
+            // Lógica de detecção de tipo melhorada
             const isSTL = extLower === 'stl';
+            const isGLB = extLower === 'glb' || extLower === 'gltf';
+            const is3D = isSTL || isGLB; // Qualquer modelo 3D
             const isImage = fileType.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(extLower);
             const isPdf = fileType === 'application/pdf' || extLower === 'pdf';
             const canPreview = isImage || isPdf; // Preview padrão (imagem/pdf)
-            const isClickable = isSTL || canPreview; // Qualquer tipo de preview
+            const isClickable = is3D || canPreview; // Qualquer tipo de preview
 
             if (currentView === 'card') {
-                // --- NOVO CARD VIEW PARA ARQUIVOS ---
+                // --- CARD VIEW PARA ARQUIVOS ---
                 el.className = `glass-card flex flex-col overflow-hidden transition-all duration-300 flex-card-basis ${isClickable ? 'cursor-pointer' : ''} ${selectedItems.has(file.id) ? 'selected-item' : ''}`;
                 
                 let thumbnailHtml = '';
@@ -958,7 +996,7 @@
                 } else {
                     // Placeholder para arquivos não-imagem
                     let iconSvg = '';
-                    if (isSTL) {
+                    if (is3D) {
                         iconSvg = `<svg class="h-24 w-24 text-orange-400 opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>`; // Ícone 3D
                     } else if (isPdf) {
                         iconSvg = `<svg class="h-24 w-24 text-orange-400 opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`; // Ícone de PDF
@@ -1025,18 +1063,13 @@
                     e.stopPropagation();
 
                     if (e.ctrlKey || e.metaKey) {
+                        // SE CTRL/META ESTIVER PRESSIONADO: Alterna seleção
                         toggleItemSelection(file.id);
                     } else {
-                        // Se já está selecionado E é a única seleção, abre o preview
-                        if (selectedItems.has(file.id) && selectedItems.size === 1) {
-                            if (isSTL) viewStlFile(file.fileUrl, file.name);
-                            else if (canPreview) viewPreview(file.fileUrl, file.name, isImage, isPdf);
-                        } else {
-                            // Caso contrário, limpa e seleciona este
-                            selectedItems.clear();
-                            selectedItems.add(file.id);
-                            updateSelectionUI();
-                        }
+                        // SE FOR CLIQUE SIMPLES: Limpa seleção e abre o preview
+                        clearSelection(); 
+                        if (is3D) view3DModel(file.fileUrl, file.name, isGLB);
+                        else if (canPreview) viewPreview(file.fileUrl, file.name, isImage, isPdf);
                     }
                 });
             } else {
@@ -1046,9 +1079,11 @@
                     e.stopPropagation();
                     
                     if (e.ctrlKey || e.metaKey) {
+                        // SE CTRL/META ESTIVER PRESSIONADO: Alterna seleção
                         toggleItemSelection(file.id);
                     } else {
-                        selectedItems.clear();
+                        // SE FOR CLIQUE SIMPLES: Limpa e seleciona este.
+                        clearSelection();
                         selectedItems.add(file.id);
                         updateSelectionUI();
                     }
@@ -1059,7 +1094,13 @@
             if (isAdminMode) {
                 el.querySelector('.btn-delete-item')?.addEventListener('click', (e) => {
                     e.stopPropagation(); // Impede que o clique acione o preview
-                    deleteFile(file.id, file.name, file.fileUrl);
+                    // CHAMA O MODAL DE CONFIRMAÇÃO
+                    promptDelete({
+                        type: 'file',
+                        id: file.id,
+                        name: file.name,
+                        url: file.fileUrl
+                    });
                 });
             }
             
@@ -1219,7 +1260,7 @@
         }
         
         /** Exclui uma pasta (SOMENTE SE ESTIVER VAZIA) */
-        async function deleteFolder(folderId, folderName, coverImageUrl, skipConfirm = false) {
+        async function deleteFolder(folderId, folderName, coverImageUrl, suppressToast = false) {
             // 1. Verifica se a pasta está vazia
             const hasChildren = allItemsCache.find(item => item.parentId === folderId);
             if (hasChildren) {
@@ -1227,9 +1268,9 @@
                 return; // Retorna uma promessa rejeitada para o Promise.all
             }
             
-            if (!skipConfirm && !window.confirm(`Tem certeza que deseja excluir a pasta "${folderName}"?`)) return;
+            // REMOVIDO: window.confirm
             
-            if (!skipConfirm) showMessage(`Excluindo pasta "${folderName}"...`, "loading");
+            if (!suppressToast) showMessage(`Excluindo pasta "${folderName}"...`, "loading");
             try {
                 // 2. Exclui a imagem de capa (se for um projeto)
                 if (coverImageUrl) {
@@ -1241,19 +1282,19 @@
                 
                 // 3. Exclui o documento da pasta
                 await deleteDoc(doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, folderId));
-                if (!skipConfirm) showMessage("Pasta excluída com sucesso!", "success");
+                if (!suppressToast) showMessage("Pasta excluída com sucesso!", "success");
             } catch (error) {
                 console.error("Erro ao excluir pasta:", error);
-                if (!skipConfirm) showMessage("Falha ao excluir pasta.", "error");
+                if (!suppressToast) showMessage("Falha ao excluir pasta.", "error");
                 throw error; // Propaga o erro para o Promise.all
             }
         }
         
         /** Exclui um arquivo */
-        async function deleteFile(fileId, fileName, fileUrl, skipConfirm = false) {
-            if (!skipConfirm && !window.confirm(`Tem certeza que deseja excluir o arquivo "${fileName}"?`)) return;
+        async function deleteFile(fileId, fileName, fileUrl, suppressToast = false) {
+            // REMOVIDO: window.confirm
             
-            if (!skipConfirm) showMessage(`Excluindo arquivo "${fileName}"...`, "loading");
+            if (!suppressToast) showMessage(`Excluindo arquivo "${fileName}"...`, "loading");
             try {
                 // 1. Excluir do Storage
                 if (fileUrl) {
@@ -1265,10 +1306,10 @@
                 
                 // 2. Excluir do Firestore
                 await deleteDoc(doc(db, `artifacts/${firebaseConfig.projectId}/users/${userId}/items`, fileId));
-                if (!skipConfirm) showMessage("Arquivo excluído com sucesso!", "success");
+                if (!suppressToast) showMessage("Arquivo excluído com sucesso!", "success");
             } catch (error) {
                 console.error("Erro ao excluir arquivo:", error);
-                if (!skipConfirm) showMessage("Falha ao excluir arquivo.", "error");
+                if (!suppressToast) showMessage("Falha ao excluir arquivo.", "error");
                 throw error; // Propaga o erro para o Promise.all
             }
         }
@@ -1281,7 +1322,7 @@
             renderCurrentFolder();
         });
         
-        // NOVO: Limpa seleção ao clicar no fundo
+        // Limpa seleção ao clicar no fundo
         itemContainer.addEventListener('click', (e) => {
             if (e.target === itemContainer) {
                 clearSelection();
@@ -1319,7 +1360,47 @@
             }
         });
         
-        // NOVO: Listeners da Barra de Seleção
+        // --- LÓGICA DO MODAL DE EXCLUSÃO (NOVO) ---
+        function promptDelete(action) {
+            deletePendingAction = action;
+            // Personaliza a mensagem
+            if (action.type === 'selection') {
+                confirmDeleteMessage.textContent = `Tem certeza que deseja excluir ${action.count} itens selecionados? Pastas não vazias serão ignoradas. Esta ação não pode ser desfeita.`;
+            } else {
+                confirmDeleteMessage.textContent = `Tem certeza que deseja excluir "${action.name}"? Esta ação não pode ser desfeita.`;
+            }
+            confirmDeleteModal.style.display = 'flex';
+        }
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            confirmDeleteModal.style.display = 'none';
+            deletePendingAction = null;
+        });
+
+        confirmDeleteBtn.addEventListener('click', async () => {
+            if (!deletePendingAction) return;
+            
+            const action = deletePendingAction;
+            deletePendingAction = null;
+            confirmDeleteModal.style.display = 'none';
+
+            switch (action.type) {
+                case 'folder':
+                    // Chama a função de exclusão original, sem suprimir o toast
+                    await deleteFolder(action.id, action.name, action.cover, false); 
+                    break;
+                case 'file':
+                    // Chama a função de exclusão original, sem suprimir o toast
+                    await deleteFile(action.id, action.name, action.url, false);
+                    break;
+                case 'selection':
+                    // Chama a nova função de lógica de exclusão em massa
+                    await executeDeleteSelection();
+                    break;
+            }
+        });
+
+        // Listeners da Barra de Seleção
         downloadSelectionBtn.addEventListener('click', () => {
             let filesToDownload = 0;
             for (const itemId of selectedItems) {
@@ -1344,9 +1425,17 @@
             clearSelection();
         });
         
+        // MODIFICADO: Chama o modal de confirmação
         deleteSelectionBtn.addEventListener('click', async () => {
-            if (!window.confirm(`Tem certeza que deseja excluir ${selectedItems.size} item(s)? Pastas NÃO vazias não serão excluídas.`)) return;
-            
+            promptDelete({
+                type: 'selection',
+                count: selectedItems.size,
+                name: `${selectedItems.size} itens`
+            });
+        });
+
+        // NOVA FUNÇÃO: Lógica de exclusão em massa (movida do listener)
+        async function executeDeleteSelection() {
             showMessage(`Excluindo ${selectedItems.size} item(s)...`, 'loading');
             let deletePromises = [];
             let failedFolders = 0;
@@ -1365,20 +1454,21 @@
                     if (hasChildren) {
                         failedFolders++;
                     } else {
-                        // Passa 'true' para pular a confirmação individual
+                        // Passa 'true' para suprimir o toast individual
                         deletePromises.push(deleteFolder(item.id, item.name, coverUrl, true)); 
                     }
                 } else if (item.type === 'file') {
-                    // Passa 'true' para pular a confirmação individual
+                    // Passa 'true' para suprimir o toast individual
                     deletePromises.push(deleteFile(item.id, item.name, item.fileUrl, true)); 
                 }
             }
             
             try {
                 await Promise.all(deletePromises);
-                let msg = `${deletePromises.length} item(s) excluído(s).`;
+                let successCount = deletePromises.length;
+                let msg = `${successCount} item(s) foram excluído(s) com sucesso.`;
                 if (failedFolders > 0) {
-                    msg += ` ${failedFolders} pasta(s) não foram excluídas pois não estão vazias.`;
+                    msg = `${successCount} item(s) excluído(s). ${failedFolders} pasta(s) não foram excluídas pois não estão vazias.`;
                 }
                 showMessage(msg, 'success', 4000);
             } catch (e) {
@@ -1386,13 +1476,13 @@
             } finally {
                 clearSelection();
             }
-        });
+        }
 
 
-        // --- LÓGICA DOS VISUALIZADORES (STL e Preview) ---
+        // --- LÓGICA DOS VISUALIZADORES (3D e Preview) ---
         
-        function initStlViewer() {
-            clearStlViewer();
+        function init3DViewer() {
+            clear3DViewer();
             const THREE = THREE_Module;
             const OrbitControls = OrbitControls_Module;
             scene = new THREE.Scene();
@@ -1402,8 +1492,17 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(stlViewerContainer.clientWidth, stlViewerContainer.clientHeight);
             stlViewerContainer.appendChild(renderer.domElement);
-            scene.add(new THREE.HemisphereLight(0xffffff, 0x080820, 1.5));
-            scene.add(new THREE.DirectionalLight(0xffffff, 0.8));
+            
+            // Luzes melhores para GLB
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Luz ambiente mais suave
+            scene.add(ambientLight);
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 2); // Luz principal
+            directionalLight1.position.set(1, 1, 1);
+            scene.add(directionalLight1);
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1); // Luz de preenchimento
+            directionalLight2.position.set(-1, -1, -1);
+            scene.add(directionalLight2);
+            
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.1;
@@ -1417,12 +1516,12 @@
                 renderer.setSize(stlViewerContainer.clientWidth, stlViewerContainer.clientHeight);
             }
         }
-        function animateStlViewer() {
-            animationFrameId = requestAnimationFrame(animateStlViewer);
+        function animate3DViewer() {
+            animationFrameId = requestAnimationFrame(animate3DViewer);
             if (controls) controls.update();
             if (renderer && scene && camera) renderer.render(scene, camera);
         }
-        function clearStlViewer() {
+        function clear3DViewer() {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', onWindowResize);
             if (renderer) {
@@ -1433,7 +1532,9 @@
             }
             scene = null; camera = null; renderer = null; controls = null;
         }
-        async function viewStlFile(fileUrl, fileName) {
+        
+        // Função unificada para abrir modelos 3D
+        async function view3DModel(fileUrl, fileName, isGLB) {
             const loaded = await ensureThreeJsLoaded();
             if (!loaded) {
                 console.error("Tentativa de abrir visualizador 3D falhou no carregamento.");
@@ -1445,38 +1546,84 @@
             showMessage("Carregando modelo 3D...", "loading");
             
             const THREE = THREE_Module;
-            const STLLoader = STLLoader_Module;
-            initStlViewer();
-            animateStlViewer();
+            init3DViewer();
+            animate3DViewer();
+
+            let loader;
+            let model;
+            let localUrl = null; // Para gerenciar o Blob URL
 
             try {
-                const loader = new STLLoader();
-                const geometry = await loader.loadAsync(fileUrl);
-                const material = new THREE.MeshPhongMaterial({ color: 0xf97316, specular: 0x111111, shininess: 100 });
-                const mesh = new THREE.Mesh(geometry, material);
-                scene.add(mesh);
-                geometry.computeBoundingBox();
-                const box = geometry.boundingBox;
+                if (isGLB) {
+                    // --- CONFIGURAÇÃO AVANÇADA DO LOADER ---
+                    const dracoLoader = new DRACOLoader_Module();
+                    dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+                    
+                    const ktx2Loader = new KTX2Loader_Module();
+                    ktx2Loader.setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/basis/');
+                    ktx2Loader.detectSupport(renderer); // Precisa do renderer
+
+                    loader = new GLTFLoader_Module();
+                    loader.setDRACOLoader(dracoLoader);
+                    loader.setKTX2Loader(ktx2Loader);
+                    loader.setMeshoptDecoder(MeshoptDecoder_Module);
+                    // --- FIM DA CONFIGURAÇÃO ---
+                    
+                    // CORREÇÃO: Fetch do arquivo manualmente para criar um Blob URL local
+                    // Isso resolve problemas de cross-origin com texturas embarcadas
+                    const response = await fetch(fileUrl);
+                    if (!response.ok) {
+                        throw new Error(`Falha ao baixar o arquivo: ${response.statusText}`);
+                    }
+                    const blob = await response.blob();
+                    localUrl = URL.createObjectURL(blob);
+
+                    const gltf = await loader.loadAsync(localUrl); // Usa a URL local
+                    model = gltf.scene; // O modelo está em gltf.scene
+                } else {
+                    // Carregar STL
+                    loader = new STLLoader_Module();
+                    const geometry = await loader.loadAsync(fileUrl);
+                    const material = new THREE.MeshPhongMaterial({ color: 0xf97316, specular: 0x111111, shininess: 100 });
+                    model = new THREE.Mesh(geometry, material);
+                }
+
+                scene.add(model);
+                
+                // Centralizar o modelo (funciona para ambos)
+                const box = new THREE.Box3().setFromObject(model);
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z);
                 const fov = camera.fov * (Math.PI / 180);
                 let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+                
+                // Evita que a câmera vá para dentro de modelos muito pequenos
+                if (cameraZ < 1) cameraZ = 1; 
+
                 camera.position.set(center.x, center.y, center.z + cameraZ);
                 controls.target.set(center.x, center.y, center.z);
                 controls.update();
+                
                 hideMessage();
                 showMessage("Modelo 3D carregado.", "success", 2000);
+
             } catch (error) {
-                console.error("Erro ao carregar modelo STL:", error);
+                console.error(`Erro ao carregar modelo ${isGLB ? 'GLB' : 'STL'}:`, error);
                 showMessage("Falha ao carregar modelo 3D.", "error");
-                clearStlViewer();
+                clear3DViewer();
                 stlViewerModal.style.display = 'none';
+            } finally {
+                // Limpa o Blob URL da memória
+                if (localUrl) {
+                    URL.revokeObjectURL(localUrl);
+                }
             }
         }
+        
         closeStlViewerBtn.addEventListener('click', () => {
             stlViewerModal.style.display = 'none';
-            clearStlViewer();
+            clear3DViewer();
         });
 
         // Lógica do Preview (Imagem/PDF)
